@@ -20,7 +20,7 @@ struct Storage {
     // possible replace with an array
     //votes: map<Int as uint12, Bool>;
 
-    votesShard: Cell;
+    votesShard: Int as uint64 = 0;
     
     // should be uint7
     yesCount: Int as uint7 = 0;
@@ -28,35 +28,11 @@ struct Storage {
 }
 
 extends mutates fun add(self: Storage, address: Int ) {
-    let builder = beginCell();
-    let count = self.yesCount + self.noCount;
-
-    let cell = self.votesShard.beginParse();
-
-    let i = 0;
-    while (i < count) {
-        builder.storeUint(cell.loadUint(6), 6);
-        i += 1;
-    }
-    builder.storeUint(address, 6);
-
-    self.votesShard = builder.endCell();
+    self.votesShard |= (1 << address);
 }
 
 extends fun check(self: Storage, address: Int): Bool {
-    let count = self.yesCount + self.noCount;
-
-    let cell = self.votesShard.beginParse();
-
-    let i = 0;
-    while (i < count) {
-        let storedAddress = cell.loadUint(6);
-        if (storedAddress == address) {
-            return true;
-        }
-        i += 1;
-    }
-    return false;
+    return (self.votesShard & (1 << address)) != 0;
 }
 
 contract Proposal {
@@ -66,7 +42,6 @@ contract Proposal {
     init(data: Init) {
         self.data = data;
         self.storage = Storage {
-            votesShard: emptyCell(),
         };
     }
 
@@ -103,10 +78,6 @@ contract Proposal {
             self.storage.yesCount += 1;
         } else {
             self.storage.noCount += 1;
-        }
-
-        if (self.storage.yesCount + self.storage.noCount > 128) {
-            throw(1000);
         }
     }
 
