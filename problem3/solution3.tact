@@ -18,28 +18,46 @@ struct Init {
 
 struct Storage {
     // possible replace with an array
-    votes: map<Int as uint32, Bool>;
+    //votes: map<Int as uint12, Bool>;
 
+    votesShard: Cell;
+    
     // should be uint7
-    yesCount: Int as uint32 = 0;
-    noCount: Int as uint32 = 0;
+    yesCount: Int as uint7 = 0;
+    noCount: Int as uint7 = 0;
 }
 
-extends mutates fun add(self: Storage, address: Address, value: Bool) {
-    //dump("add");
-    //dump(address);
-    let addressShifted = address.asSlice().loadUint(256) >> (256-32);
-    //dump(addressShifted);
-    require(!self.votes.exists(addressShifted), "Cannot vote twice");
+extends mutates fun add(self: Storage, address: Int ) {
+    let builder = beginCell();
+    let count = self.yesCount + self.noCount;
 
-    self.votes.set(addressShifted, value);
-    if (value) {
-        self.yesCount += 1;
-    } else {
-        self.noCount += 1;
+    let cell = self.votesShard.beginParse();
+
+    let i = 0;
+    while (i < count) {
+        builder.storeUint(cell.loadUint(6), 6);
+        i += 1;
     }
+    builder.storeUint(address, 6);
+
+    self.votesShard = builder.endCell();
 }
 
+extends fun check(self: Storage, address: Int): Bool {
+    let count = self.yesCount + self.noCount;
+
+    let cell = self.votesShard.beginParse();
+
+    let i = 0;
+    while (i < count) {
+        let storedAddress = cell.loadUint(6);
+        if (storedAddress == address) {
+            return true;
+        }
+        i += 1;
+    }
+    return false;
+}
 
 contract Proposal {
     data: Init;
@@ -48,7 +66,7 @@ contract Proposal {
     init(data: Init) {
         self.data = data;
         self.storage = Storage {
-            votes: emptyMap(),
+            votesShard: emptyCell(),
         };
     }
 
@@ -56,17 +74,40 @@ contract Proposal {
     receive() { }
 
     receive(msg: Vote) {
-        
-        // get current time
-        let currentTime: Int = now();
-
+            
         // validation
-        require(currentTime <= self.data.votingEndingAt, "Voting has ended");
+        // 4000 - 3890 = 110 gas
+        require(now() <= self.data.votingEndingAt, "Voting has ended");
 
-        self.storage.add(sender(), msg.value);
 
-        // this was hard to find
-        cashback(sender());
+        // inline function = 62
+
+
+        let sender = sender();
+        let value = msg.value;
+        // 4000 - 2628 = 1372 gas for removed function call
+
+
+
+        // 4000 - 3923 = 77 gas
+        let addressShifted = sender.asSlice().loadUint(256) >> (256-32) & 0x3F;
+        //dump(addressShifted);
+        // 4000 - 3784 = 216 gas
+       //require(!self.storage.votes.exists(addressShifted), "Cannot vote twice");
+       require(!self.storage.check(addressShifted), "Cannot vote twice");
+
+        // 4000 - 3184 = 816 gas
+        self.storage.add(addressShifted);
+        // 4000 - 3888 = 112 gas
+        if (value) {
+            self.storage.yesCount += 1;
+        } else {
+            self.storage.noCount += 1;
+        }
+
+        if (self.storage.yesCount + self.storage.noCount > 128) {
+            throw(1000);
+        }
     }
 
     get fun proposalState(): ProposalState {
