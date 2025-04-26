@@ -16,33 +16,23 @@ struct Init {
     votingEndingAt: Int as uint32;
 }
 
-struct Storage {
-    // possible replace with an array
-    //votes: map<Int as uint12, Bool>;
+asm extends fun asInt(self: Bool): Int {}
 
+
+// remove proposalid from init = -50 gas to 5169
+// unpack all the variables = -72 gas to 5097
+// inlining add and check = -110 gas to 4987
+// switching from if and yes/no to totalCount and yesCountNegative = -33 gas to 4954
+contract Proposal {
+    votingEndingAt: Int as uint32;
     votesShard: Int as uint64 = 0;
     
     // should be uint7
-    yesCount: Int as uint7 = 0;
-    noCount: Int as uint7 = 0;
-}
-
-extends mutates fun add(self: Storage, address: Int ) {
-    self.votesShard |= (1 << address);
-}
-
-extends fun check(self: Storage, address: Int): Bool {
-    return (self.votesShard & (1 << address)) != 0;
-}
-
-contract Proposal {
-    data: Init;
-    storage: Storage;
+    totalCount: Int as uint7 = 0;
+    yesCountNegative: Int as int7 = 0;
 
     init(data: Init) {
-        self.data = data;
-        self.storage = Storage {
-        };
+        self.votingEndingAt = data.votingEndingAt;
     }
 
     // deploy
@@ -52,39 +42,37 @@ contract Proposal {
             
         // validation
         // 4000 - 3890 = 110 gas
-        require(now() <= self.data.votingEndingAt, "Voting has ended");
+        require(now() <= self.votingEndingAt, "Voting has ended");
 
 
-        // inline function = 62
 
 
         let sender = sender();
         let value = msg.value;
-        // 4000 - 2628 = 1372 gas for removed function call
 
 
+        let senderSlice = sender.asSlice();
+        senderSlice.skipBits(224);
+        let addressShifted = senderSlice.loadUint(32) & 0x3F;
 
-        // 4000 - 3923 = 77 gas
-        let addressShifted = sender.asSlice().loadUint(256) >> (256-32) & 0x3F;
-        //dump(addressShifted);
-        // 4000 - 3784 = 216 gas
-       //require(!self.storage.votes.exists(addressShifted), "Cannot vote twice");
-       require(!self.storage.check(addressShifted), "Cannot vote twice");
+        // 192 gas
+        //let addressShifted = sender.asSlice().loadUint(256) >> (256-32) & 0x3F;
+        // 155 gas
+        require((self.votesShard & (1 << addressShifted)) == 0, "Cannot vote twice");
 
-        // 4000 - 3184 = 816 gas
-        self.storage.add(addressShifted);
-        // 4000 - 3888 = 112 gas
-        if (value) {
-            self.storage.yesCount += 1;
-        } else {
-            self.storage.noCount += 1;
-        }
+        // 72 gas
+        self.votesShard |= (1 << addressShifted);
+  
+        // 106 gas
+        self.yesCountNegative += value.asInt();
+        // 36 gas
+        self.totalCount += 1;
     }
 
     get fun proposalState(): ProposalState {
         return ProposalState {
-            yesCount: self.storage.yesCount,
-            noCount: self.storage.noCount,
+            yesCount: -self.yesCountNegative,
+            noCount: self.totalCount + self.yesCountNegative,
         };
     }
 }
