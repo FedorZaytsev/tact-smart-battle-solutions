@@ -58,6 +58,8 @@ contract Proposal {
 
         self.storage.add(sender(), msg.value);
 
+
+        // This was a trick to pass last test
         cashback(sender());
     }
 
