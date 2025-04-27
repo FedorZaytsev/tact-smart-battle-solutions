@@ -3,7 +3,6 @@ temp
 build
 dist
 .DS_Store
-output
 
 # VS Code
 .vscode/*
@@ -15,3 +14,8 @@ output
 
 # VIM
 Session.vim
+
+# Ignore everything in output folder
+output/*
+# But don't ignore solution3_Proposal_handcrafted.fc
+!output/solution3_Proposal_handcrafted.fc

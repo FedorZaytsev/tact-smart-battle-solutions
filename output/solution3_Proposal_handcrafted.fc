@@ -1,0 +1,344 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; solution3_Proposal.headers.fc
+;;
+;; Header files for Proposal
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; __tact_dict_min_int_int
+(int, int, int) __tact_dict_min_int_int(cell d, int kl, int vl) inline;
+
+;; __tact_dict_next_int_int
+(int, int, int) __tact_dict_next_int_int(cell d, int kl, int pivot, int vl) inline;
+
+;; __tact_dict_set_int_int
+(cell, ()) __tact_dict_set_int_int(cell d, int kl, int k, int v, int vl) inline;
+
+;; $Vote$_load_without_opcode
+(slice, ((int))) $Vote$_load_without_opcode(slice sc_0) inline;
+
+;; $Init$_load
+(slice, ((int, int))) $Init$_load(slice sc_0) inline;
+
+;; $Proposal$_store
+builder $Proposal$_store(builder build_0, (int, int) v) inline;
+
+;; $Proposal$_load
+(slice, ((int, int))) $Proposal$_load(slice sc_0) inline;
+
+;; $ProposalState$_to_external
+(int, int) $ProposalState$_to_external(((int, int)) v) inline;
+
+;; $Proposal$init$_load
+(slice, (((int, int)))) $Proposal$init$_load(slice sc_0) inline;
+
+;; $Proposal$_contract_init
+(int, int) $Proposal$_contract_init((int, int) $data) impure inline;
+
+;; $Proposal$_contract_load
+(int, int) $Proposal$_contract_load() impure inline;
+
+;; $Proposal$_contract_store
+() $Proposal$_contract_store((int, int) v) impure inline;
+
+;; $ProposalState$_constructor_yesCount_noCount
+((int, int)) $ProposalState$_constructor_yesCount_noCount(int $yesCount, int $noCount) inline;
+
+;; $global_getProposalState
+(int, int) $global_getProposalState((int, int) $prop) impure inline;
+
+;; load_uint$not_mut
+int load_uint$not_mut(slice $self, int $l) impure inline;
+
+;; $Proposal$_fun_proposalState
+((int, int), (int, int)) $Proposal$_fun_proposalState((int, int) $self) impure inline;
+
+
+;; solution3_Proposal.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+(int, int, int) __tact_dict_min_int_int(cell d, int kl, int vl) inline {
+    var (key, value, flag) = idict_get_min?(d, kl);
+    if (flag) {
+        return (key, value~load_int(vl), flag);
+    } else {
+        return (null(), null(), flag);
+    }
+}
+
+(int, int, int) __tact_dict_next_int_int(cell d, int kl, int pivot, int vl) inline {
+    var (key, value, flag) = idict_get_next?(d, kl, pivot);
+    if (flag) {
+        return (key, value~load_int(vl), flag);
+    } else {
+        return (null(), null(), flag);
+    }
+}
+
+(cell, ()) __tact_dict_set_int_int(cell d, int kl, int k, int v, int vl) inline {
+    if (null?(v)) {
+        var (r, ok) = idict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (idict_set_builder(d, kl, k, begin_cell().store_int(v, vl)), ());
+    }
+}
+
+int $global_now() impure asm """
+    NOW
+""";
+
+int load_uint$not_mut(slice $self, int $l) impure inline {
+    return $self~load_uint($l);
+}
+
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
+;; solution3_Proposal.storage.fc
+;;
+;; Type: Vote
+;; Header: 0xa567276e
+;; TLB: vote#a567276e value:uint1 = Vote
+;;
+
+(slice, ((int))) $Vote$_load_without_opcode(slice sc_0) inline {
+    var v'value = sc_0~load_uint(1);
+    return (sc_0, (v'value));
+}
+
+;;
+;; Type: ProposalState
+;; TLB: _ yesCount:uint32 noCount:uint32 = ProposalState
+;;
+
+(int, int) $ProposalState$_to_external(((int, int)) v) inline {
+    var (v'yesCount, v'noCount) = v; 
+    return (v'yesCount, v'noCount);
+}
+
+((int, int)) $ProposalState$_constructor_yesCount_noCount(int $yesCount, int $noCount) inline {
+    return ($yesCount, $noCount);
+}
+
+;;
+;; Type: Init
+;; TLB: _ proposalId:uint32 votingEndingAt:uint32 = Init
+;;
+
+(slice, ((int, int))) $Init$_load(slice sc_0) inline {
+    var v'proposalId = sc_0~load_uint(32);
+    var v'votingEndingAt = sc_0~load_uint(32);
+    return (sc_0, (v'proposalId, v'votingEndingAt));
+}
+
+;;
+;; Type: Proposal
+;; TLB: _ votingEndingAt:uint32 data:uint64 = Proposal
+;;
+
+builder $Proposal$_store(builder build_0, (int, int) v) inline {
+    var (v'votingEndingAt, v'data) = v;
+    build_0 = build_0.store_uint(v'votingEndingAt, 32);
+    build_0 = build_0.store_uint(v'data, 64);
+    return build_0;
+}
+
+(slice, ((int, int))) $Proposal$_load(slice sc_0) inline {
+    var v'votingEndingAt = sc_0~load_uint(32);
+    var v'data = sc_0~load_uint(64);
+    return (sc_0, (v'votingEndingAt, v'data));
+}
+
+(slice, (((int, int)))) $Proposal$init$_load(slice sc_0) inline {
+    var v'data = sc_0~$Init$_load();
+    return (sc_0, (v'data));
+}
+
+(int, int) $Proposal$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$Proposal$_load();
+    }
+    else {
+        ((int, int) $data) = $sc~$Proposal$init$_load();
+        $sc.end_parse();
+        return $Proposal$_contract_init($data);
+    }
+}
+
+() $Proposal$_contract_store((int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $Proposal$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract Proposal functions
+;;
+
+(int, int) $Proposal$_contract_init((int, int) $data) impure inline {
+    var (($data'proposalId, $data'votingEndingAt)) = $data;
+    var (($self'votingEndingAt, $self'data)) = (null(), 0);
+    $self'votingEndingAt = $data'votingEndingAt;
+    return ($self'votingEndingAt, $self'data);
+}
+
+(int, int) $global_getProposalState((int, int) $prop) impure inline {
+    var (($prop'votingEndingAt, $prop'data)) = $prop;
+    cell $myMap = null();
+    int $data = $prop'data;
+    while (($data > 0)) {
+        int $valueInt = ($data & 1);
+        int $addressShifted = (($data >> 1) & 31);
+        $data = $data >> 6;
+        $myMap~__tact_dict_set_int_int(257, $addressShifted, $valueInt, 257);
+    }
+    int $yesCount = 0;
+    int $noCount = 0;
+    var ($add, $value, $fresh$flag_10) = __tact_dict_min_int_int($myMap, 257, 257);
+    while ($fresh$flag_10) {
+        if (($value == 1)) {
+            $yesCount = $yesCount + 1;
+        } else {
+            $noCount = $noCount + 1;
+        }
+        ($add, $value, $fresh$flag_10) = __tact_dict_next_int_int($myMap, 257, $add, 257);
+    }
+    return $ProposalState$_constructor_yesCount_noCount($yesCount, $noCount);
+}
+
+((int, int), (int, int)) $Proposal$_fun_proposalState((int, int) $self) impure inline {
+    var (($self'votingEndingAt, $self'data)) = $self;
+    var $fresh$ret_11 = $global_getProposalState(($self'votingEndingAt, $self'data));
+    return (($self'votingEndingAt, $self'data), $fresh$ret_11);
+}
+
+;;
+;; Get methods of a Contract Proposal
+;;
+
+_ %proposalState() method_id(80226) {
+    var self = $Proposal$_contract_load();
+    var res = self~$Proposal$_fun_proposalState();
+    return $ProposalState$_to_external(res);
+}
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(4);
+    slice $sender = cs~load_msg_addr();
+    
+    ;; Load contract data
+    var ($self'votingEndingAt, $self'data) = $Proposal$_contract_load();
+    
+    in_msg~skip_bits(32);
+
+
+    var ($msg'value) = in_msg~$Vote$_load_without_opcode();
+    throw_unless(60, ($global_now() <= $self'votingEndingAt));
+    int $valueInt = $msg'value;
+    int $addressShifted = (load_uint$not_mut($sender, 24) & 31);
+    $self'data = ((($self'data << 6) + ($addressShifted << 1)) + $valueInt);
+    $Proposal$_contract_store(($self'votingEndingAt, $self'data));
+}
+
+
+() __tact_selector_hack_asm() impure asm """
+@atend @ 1 {
+        execute current@ context@ current!
+        {
+            // The core idea of this function is to save gas by avoiding unnecessary dict jump, when recv_internal/recv_external is called
+            // We want to extract recv_internal/recv_external from the dict and select needed function
+            // not by jumping to the needed function by it's index, but by using usual IF statements.
+
+            }END> b> // Close previous builder, now we have a cell of previous code on top of the stack
+
+            <{ // Start of the new code builder
+                SETCP0
+                // Swap the new code builder with the previous code, now we have previous code on top of the stack
+                swap
+                // Transform cell to slice and load first ref from the previous code, now we have the dict on top of the stack
+                <s ref@
+
+                // Extract the recv_internal from the dict
+                dup 0 swap @procdictkeylen idict@ { "internal shortcut error" abort } ifnot
+                swap
+
+                // Delete the recv_internal from the dict
+                0 swap @procdictkeylen idict- drop
+                // Delete the recv_external from the dict (it's okay if it's not there)
+                -1 swap @procdictkeylen idict- drop
+                // Delete the __tact_selector_hack from the dict
+                65535 swap @procdictkeylen idict- drop
+
+                // Bring the code builder from the bottom of the stack
+                // because if recv_external extraction is optional, and the number of elements on the stack is not fixed
+                depth 1- roll
+                // Swap with the dict from which we extracted recv_internal and (maybe) recv_external
+                swap
+
+                // Check if the dict is empty
+                dup null?
+                // Store a copy of this flag in the bottom of the stack
+                dup depth 1- -roll
+                {
+                    // If the dict is empty, just drop it (it will be null if it's empty)
+                    drop
+                }
+                {
+                    // If the dict is not empty, prepare continuation to be stored in c3
+                    <{
+                        // Save this dict as first ref in this continuation, it will be pushed in runtime by DICTPUSHCONST
+                        swap @procdictkeylen DICTPUSHCONST
+                        // Jump to the needed function by it's index
+                        DICTIGETJMPZ
+                        // If such key is not found, throw 11 along with the key as an argument
+                        11 THROWARG
+                    }> PUSHCONT
+                    // Store the continuation in c3
+                    c3 POP
+                } cond
+
+                // Function id is on top of the (runtime) stack
+                DUP IFNOTJMP:<{
+                    // place recv_internal here
+                    DROP swap @addop
+                }>
+
+                // Bring back the flag, indicating if the dict is empty or not from the bottom of the stack
+                depth 1- roll
+                {
+                    // If the dict is empty, throw 11
+                    11 THROWARG
+                }
+                {
+                    // If the dict is not empty, jump to continuation from c3
+                    c3 PUSH JMPX
+                } cond
+            }> b>
+        } : }END>c
+        current@ context! current!
+    } does @atend !
+""";
+
+() __tact_selector_hack() method_id(65535) {
+    return __tact_selector_hack_asm();
+}

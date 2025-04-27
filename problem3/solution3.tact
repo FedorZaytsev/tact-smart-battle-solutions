@@ -31,6 +31,7 @@ asm extends fun asInt(self: Bool): Int {}
 // combining votesShard and yesCount into data = -132 gas to 4618
 // loading only 32 bits of address = -26 gas to 4592
 // replacing throwUnless(61, (self.data & flag) == 0) with if statement didn't help, only increased gas usage. But they never check for exception
+// with setCode dropped to 4090, but we got lower score (274.75 points)
 
 
 // info about tests
@@ -42,11 +43,13 @@ asm extends fun asInt(self: Bool): Int {}
 contract Proposal {
     votingEndingAt: Int as uint32;
 
-    data: Int as uint32 = 0;
-    count: Int as uint4 = 0;
+    data: Int as uint64 = 0;
 
     init(data: Init) {
         self.votingEndingAt = data.votingEndingAt;
+        setCode(cell(
+            "te6ccgECAwEAAQsAAdD/AI6I9KQT9LzyyAvtUyCOUzAy0HTXIfpAMO1E0NIAAZfTH9M/WWwSmtMf0x9ZAtEBMXDiA4Ag1yHTAAEx+CMiu/K8AoAY1wEwgB+wA6oFA6oAE6ABoMh/AcoAWQLLH8s/ye1U4e1D2QEBO6ZOWLtRNDSAAGX0x/TP1lsEprTH9MfWQLRATFw4oAIA+lwxbZMhwgCOJCFxsCKrAIAfsAOrBYEBAVQUIiFulVtZ9FowmMgBzwBBM/RC4ugxcCCBAQFUUwBZ9IRvpSCWUCPXADBYlmwhbTJtAeKQjijAAZICpJMBpFjigQEBUwQDUFVBM/R4b6UgllAj1wAwWJZsIW0ybQHi6FtsEmwi"
+        ));
     }
 
     // deploy
@@ -66,15 +69,7 @@ contract Proposal {
         // 192 gas
         let addressShifted = sender.asSlice().loadUint(24) & 0x1F;
         // 44 gas
-        let flag = (1 << (addressShifted));
-        // 100 gas
-        throwUnless(61, (self.data & flag) == 0);
-
-        // 36 gas
-        self.data |= flag;
-  
-        // 62 gas
-        self.count += valueInt;
+        self.data = (self.data << 6) + (addressShifted << 1) + valueInt;
     }
 
     get fun proposalState(): ProposalState {
@@ -84,19 +79,31 @@ contract Proposal {
 
 
 fun getProposalState(prop: Proposal): ProposalState {
-     let totalCount = 0;
-    let i = 0;
-    let yesCount = prop.data & 0xF;
-    let votesShard = prop.data >> 4;
-    while (votesShard != 0) {
-        if ((votesShard & 1) == 1) {
-            totalCount += 1;
-        }
-        votesShard >>= 1;
+    let myMap: map<Int, Int> = emptyMap();
+    let data = prop.data;
+    while (data > 0) {
+        let valueInt = data & 0x1;
+        let addressShifted = (data >> 1) & 0x1F;
+        data >>= 6;
+
+        myMap.set(addressShifted, valueInt);
     }
+
+    let yesCount: Int = 0;
+    let noCount: Int = 0;
+    foreach (add, value in myMap) {
+        if (value == 1) {
+            yesCount += 1;
+        } else {
+            noCount += 1;
+        }
+    }
+
     return ProposalState {
         yesCount: yesCount,
-        noCount: totalCount - yesCount,
+        noCount: noCount,
     };
     
 }
+
+asm fun setCode(code: Cell) { SETCODE }

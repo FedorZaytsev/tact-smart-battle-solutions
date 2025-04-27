@@ -1,7 +1,9 @@
 import '@ton/test-utils';
 import { Blockchain, printTransactionFees } from '@ton/sandbox';
-import { toNano, beginCell } from '@ton/core';
+import { toNano, beginCell, Cell } from '@ton/core';
+import {compileFunc, compilerVersion} from '@ton-community/func-js';
 import { Proposal } from '../output/solution3_Proposal';
+import fs from 'fs';
 
 async function vote(blockchain: Blockchain, proposal: any, senderName: any, value: boolean) {
     return await proposal.send(
@@ -19,13 +21,16 @@ it('solution3', async () => {
     const blockchain = await Blockchain.create();
 
     // create contract from init()
-    const proposal = blockchain.openContract(
+    var proposal = blockchain.openContract(
         await Proposal.fromInit({
             $$type: 'Init',
             proposalId: 0n,
             votingEndingAt: BigInt(Math.floor(Date.now() / 1000)) + 24n * 60n * 60n,
         }),
     );
+
+
+    console.log("code base64 ", proposal.init?.code?.toBoc({ idx: false }).toString('base64'))
 
     // deploy contract
     const deployer = await blockchain.treasury('deployer');
@@ -36,7 +41,7 @@ it('solution3', async () => {
         },
         null, // empty message, handled by `receive()` without parameters
     );
-    console.log(deployResult);
+    //console.log(deployResult);
 
     const TRUE = 1;
     const FALSE = 0;
@@ -55,6 +60,14 @@ it('solution3', async () => {
         .storeUint(TRUE, 1)
         .endCell().asSlice()*/
     );
+
+
+//    console.log("voteResult", voteResult)
+
+
+
+    console.log("code base64 after update ", proposal.init?.code?.toBoc({ idx: false }).toString('base64'))
+
     printTransactionFees(voteResult.transactions);
     var totalGasFees = 0;
     var totalGasUsed = 0;
@@ -73,6 +86,38 @@ it('solution3', async () => {
     expect(await proposal.getProposalState()).toMatchObject({ yesCount: 1n, noCount: 0n });
 });
 
+it('compile_handcrafted_code', async () => {
+    // You can get compiler version 
+    let version = await compilerVersion();
+    
+    // Read the Fift file
+    const funCCode = fs.readFileSync('/Users/lobster/Documents/ton/tact-smart-battle/output/solution3_Proposal_handcrafted.fc', 'utf-8');
+    const stdlibCode = fs.readFileSync('/Users/lobster/Documents/ton/tact-smart-battle/output/stdlib.fc', 'utf-8');
+    
+    let result = await compileFunc({
+        // Targets of your project
+        targets: ['solution3_Proposal_handcrafted.fc'],
+        // Sources
+        sources: {
+            "solution3_Proposal_handcrafted.fc": '#include "stdlib.fc";\n' + funCCode,
+            "stdlib.fc": stdlibCode,
+            // The rest of the files which are included in main.fc if any
+        }
+    });
+
+    if (result.status === 'error') {
+        console.error(result.message)
+        return;
+    }
+
+    // result.codeBoc contains base64 encoded BOC with code cell 
+    let codeCell = Cell.fromBoc(Buffer.from(result.codeBoc, "base64"))[0];
+    
+    // result.fiftCode contains assembly version of your code (for debug purposes)
+    console.log(result.codeBoc)
+    console.log(result.fiftCode)
+});
+//*/
 /*
 it('solution3_1', async () => {
     const blockchain = await Blockchain.create();
