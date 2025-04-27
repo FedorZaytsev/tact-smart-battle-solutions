@@ -39,17 +39,23 @@ it('solution5', async () => {
     );
     //console.log("Proposal vote result", voteResult);
     printTransactionFees(voteResult.transactions);
+    var totalGasFees = 0;
+    var totalGasUsed = 0;
     for (const tx of voteResult.transactions) {
         const computePhase = tx.description.computePhase.type === 'vm'
         ? tx.description.computePhase : undefined;
-        const actionPhase = tx.description.actionPhase.type === 'vm'
-        ? tx.description.actionPhase : undefined;
+        //const actionPhase = tx.description.actionPhase.type === 'vm'
+        //? tx.description.actionPhase : undefined;
         console.log("tx gas fee", computePhase?.gasFees);
         console.log("tx gas used", computePhase?.gasUsed);
-        console.log("tx action fee", actionPhase?.gasFees);
-        console.log("tx action used", actionPhase?.gasUsed);
+        totalGasFees += Number(computePhase?.gasFees ?? 0n);
+        totalGasUsed += Number(computePhase?.gasUsed ?? 0n);
+        //console.log("tx action fee", actionPhase?.gasFees);
+        //console.log("tx action used", actionPhase?.gasUsed);
     }
-    console.log("proposal contract balance after 0.1 ton vote", await blockchain.getContract(proposal.address).then(c => c.balance));
+    //console.log("proposal contract balance after 0.1 ton vote", await blockchain.getContract(proposal.address).then(c => c.balance));
+    console.log("total gas fees", totalGasFees);
+    console.log("total gas used", totalGasUsed);
 
 
     // the vote was counted

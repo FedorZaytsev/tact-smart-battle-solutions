@@ -2,6 +2,9 @@
 // Public solution template
 //
 
+
+// THIS SMART CONTRACT MIGHT BE BROKEN
+
 message Vote {
     value: Bool;
 }

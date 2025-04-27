@@ -28,11 +28,10 @@ asm extends fun asInt(self: Bool): Int {}
 // replace double calculation of flag = -36 gas to 4766
 // changing type of vote from bool to uint1 won't help
 // throw 1 instead of 1000 = -16 gas to 4750
+// combining votesShard and yesCount into data = -132 gas to 4618
+// loading only 32 bits of address = -26 gas to 4592
 contract Proposal {
     votingEndingAt: Int as uint32;
-    //votesShard: Int as uint64 = 0;
-    
-    //yesCount: Int as uint7 = 0;
 
     data: Int as uint72 = 0;
 
@@ -55,7 +54,7 @@ contract Proposal {
         let valueInt = msg.value;
 
         // 192 gas
-        let addressShifted = sender.asSlice().loadUint(256) >> (256-32) & 0x3F;
+        let addressShifted = sender.asSlice().loadUint(32) & 0x3F;
         // 44 gas
         let flag = (1 << (addressShifted + 8));
         // 100 gas
