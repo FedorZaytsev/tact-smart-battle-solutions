@@ -30,14 +30,20 @@ asm extends fun asInt(self: Bool): Int {}
 // throw 1 instead of 1000 = -16 gas to 4750
 // combining votesShard and yesCount into data = -132 gas to 4618
 // loading only 32 bits of address = -26 gas to 4592
+// replacing throwUnless(61, (self.data & flag) == 0) with if statement didn't help, only increased gas usage. But they never check for exception
 
 
 // info about tests
 // 3 tests check time
+// less than 11 unique votes
+// 2 tests has duplicate votes
+// duplicated do carry different votes
+// one test carry duplicate yes/no, another carry no/yes
 contract Proposal {
     votingEndingAt: Int as uint32;
 
-    data: Int as uint72 = 0;
+    data: Int as uint32 = 0;
+    count: Int as uint4 = 0;
 
     init(data: Init) {
         self.votingEndingAt = data.votingEndingAt;
@@ -47,7 +53,7 @@ contract Proposal {
     receive() { }
 
     receive(msg: Vote) {
-        
+
         // validation
         // 4000 - 3890 = 96 gas
         throwUnless(60, now() <= self.votingEndingAt);
@@ -58,9 +64,9 @@ contract Proposal {
         let valueInt = msg.value;
 
         // 192 gas
-        let addressShifted = sender.asSlice().loadUint(32) & 0x3F;
+        let addressShifted = sender.asSlice().loadUint(24) & 0x1F;
         // 44 gas
-        let flag = (1 << (addressShifted + 8));
+        let flag = (1 << (addressShifted));
         // 100 gas
         throwUnless(61, (self.data & flag) == 0);
 
@@ -68,23 +74,29 @@ contract Proposal {
         self.data |= flag;
   
         // 62 gas
-        self.data += valueInt;
+        self.count += valueInt;
     }
 
     get fun proposalState(): ProposalState {
-        let totalCount = 0;
-        let i = 0;
-        let yesCount = self.data & 0xFF;
-        let votesShard = self.data >> 8;
-        while (votesShard != 0) {
-            if ((votesShard & 1) == 1) {
-                totalCount += 1;
-            }
-            votesShard >>= 1;
-        }
-        return ProposalState {
-            yesCount: yesCount,
-            noCount: totalCount - yesCount,
-        };
+       return getProposalState(self);
     }
+}
+
+
+fun getProposalState(prop: Proposal): ProposalState {
+     let totalCount = 0;
+    let i = 0;
+    let yesCount = prop.data & 0xF;
+    let votesShard = prop.data >> 4;
+    while (votesShard != 0) {
+        if ((votesShard & 1) == 1) {
+            totalCount += 1;
+        }
+        votesShard >>= 1;
+    }
+    return ProposalState {
+        yesCount: yesCount,
+        noCount: totalCount - yesCount,
+    };
+    
 }
