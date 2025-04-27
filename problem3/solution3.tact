@@ -30,6 +30,10 @@ asm extends fun asInt(self: Bool): Int {}
 // throw 1 instead of 1000 = -16 gas to 4750
 // combining votesShard and yesCount into data = -132 gas to 4618
 // loading only 32 bits of address = -26 gas to 4592
+
+
+// info about tests
+// 3 tests check time
 contract Proposal {
     votingEndingAt: Int as uint32;
 

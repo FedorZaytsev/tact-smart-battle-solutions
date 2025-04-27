@@ -2,9 +2,6 @@
 // Public solution template
 //
 
-
-// THIS SMART CONTRACT MIGHT BE BROKEN
-
 message Vote {
     value: Bool;
 }
@@ -19,60 +16,56 @@ struct Init {
     votingEndingAt: Int as uint32;
 }
 
-asm extends fun asInt(self: Bool): Int {}
 
 
 contract Proposal {
     votingEndingAt: Int as uint32;
-    votesShard: Int as uint64 = 0;
-    
-    yesCountNegative: Int as int7 = 0;
+    // possible replace with an array
+    votes: map<Address, Bool>;
+
+    // should be uint7
+    size: Int as uint32 = 0;
 
     init(data: Init) {
         self.votingEndingAt = data.votingEndingAt;
+        self.votes = emptyMap();
     }
 
     // deploy
     receive() { }
 
     receive(msg: Vote) {
-        
-        throwUnless(1000, now() <= self.votingEndingAt);
-
+        throwUnless(60, now() <= self.votingEndingAt);
 
         let sender = sender();
-        let value = msg.value;
 
 
-        // 192 gas
-        let addressShifted = sender.asSlice().loadUint(256) >> (256-32) & 0x3F;
-        // 155 gas
-        throwUnless(1001, (self.votesShard & (1 << addressShifted)) == 0);
+        throwUnless(61, self.size < 100);
+        throwUnless(62, !self.votes.exists(sender));
 
-        // 72 gas
-        self.votesShard |= (1 << addressShifted);
-  
-        // 106 gas
-        self.yesCountNegative += value.asInt();
+        self.votes.set(sender, msg.value);
+        self.size += 1;
 
-
-        // This was a trick to pass last test
-        cashback(sender());
+        if (context().value > 40_000_000_000) {
+            cashback(sender);
+        }
     }
 
     get fun proposalState(): ProposalState {
-        let totalCount = 0;
-        let i=0;
-        let votesShard = self.votesShard;
-        while (votesShard != 0) {
-            if ((votesShard & 1) == 1) {
-                totalCount += 1;
+        let yesCount: Int = 0;
+        let noCount: Int = 0;
+
+        foreach (address, vote in self.votes) {
+            if (vote) {
+                yesCount += 1;
+            } else {
+                noCount += 1;
             }
-            votesShard >>= 1;
         }
+
         return ProposalState {
-            yesCount: -self.yesCountNegative,
-            noCount: totalCount + self.yesCountNegative,
+            yesCount: yesCount,
+            noCount: noCount,
         };
     }
 }

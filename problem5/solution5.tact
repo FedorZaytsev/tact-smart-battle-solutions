@@ -22,6 +22,7 @@ asm extends fun asInt(self: Bool): Int {}
 // solution 5 is based on solution 3
 // contract specific optimizations:
 // Only do cashback if context().value > 100_000_000: +30 point on the leaderboard
+// replaced getComputeFee(2877, true) with a static value
 contract Proposal {
     votingEndingAt: Int as uint32;
 
@@ -64,7 +65,7 @@ contract Proposal {
         self.data += valueInt;
         
         // 6387 - 4814 = 1573 gas
-        if (contextValue > 30_000_000_000) {
+        if (contextValue > 40_000_000_000) {
             cashback(sender);
         }
     }
