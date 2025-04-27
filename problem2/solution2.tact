@@ -34,7 +34,6 @@ contract ProposalMaster {
         });
 
         self.proposalId += 1;
-        cashback(sender());
     }
 
     get fun nextProposalId(): Int {
@@ -92,7 +91,6 @@ contract Proposal {
 
         self.storage.add(sender(), msg.value);
 
-        cashback(sender());
     }
 
     get fun proposalState(): ProposalState {
