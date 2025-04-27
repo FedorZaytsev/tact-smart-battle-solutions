@@ -16,64 +16,66 @@ struct Init {
     votingEndingAt: Int as uint32;
 }
 
-struct Storage {
-    // possible replace with an array
-    votes: map<Int as uint32, Bool>;
-
-    // should be uint7
-    yesCount: Int as uint32 = 0;
-    noCount: Int as uint32 = 0;
-}
-
-extends mutates fun add(self: Storage, address: Address, value: Bool) {
-    //dump("add");
-    //dump(address);
-    let addressShifted = address.asSlice().loadUint(256) >> (256-32);
-    //dump(addressShifted);
-    require(!self.votes.exists(addressShifted), "Cannot vote twice");
-
-    self.votes.set(addressShifted, value);
-    if (value) {
-        self.yesCount += 1;
-    } else {
-        self.noCount += 1;
-    }
-}
+asm extends fun asInt(self: Bool): Int {}
 
 
+// remove proposalid from init = -50 gas to 5169
+// unpack all the variables = -72 gas to 5097
+// inlining add and check = -110 gas to 4987
+// switching from if and yes/no to totalCount and yesCountNegative = -33 gas to 4954
 contract Proposal {
-    data: Init;
-    storage: Storage;
+    votingEndingAt: Int as uint32;
+    votesShard: Int as uint64 = 0;
+    
+    yesCountNegative: Int as int7 = 0;
 
     init(data: Init) {
-        self.data = data;
-        self.storage = Storage {
-            votes: emptyMap(),
-        };
+        self.votingEndingAt = data.votingEndingAt;
     }
 
     // deploy
     receive() { }
 
     receive(msg: Vote) {
-        require(context().value > getComputeFee(5600, true), "Not enough gas");
+        throwUnless(1002, context().value > getComputeFee(4331, true));
         
-        // get current time
-        let currentTime: Int = now();
-
         // validation
-        require(currentTime <= self.data.votingEndingAt, "Voting has ended");
+        // 4000 - 3890 = 96 gas
+        throwUnless(1000, now() <= self.votingEndingAt);
 
-        self.storage.add(sender(), msg.value);
 
-        // this was hard to find
+
+
+        let sender = sender();
+        let value = msg.value;
+
+
+        // 192 gas
+        let addressShifted = sender.asSlice().loadUint(256) >> (256-32) & 0x3F;
+        // 155 gas
+        throwUnless(1001, (self.votesShard & (1 << addressShifted)) == 0);
+
+        // 72 gas
+        self.votesShard |= (1 << addressShifted);
+  
+        // 106 gas
+        self.yesCountNegative += value.asInt();
         cashback(sender());
     }
 
     get fun proposalState(): ProposalState {
+        let totalCount = 0;
+        let i=0;
+        let votesShard = self.votesShard;
+        while (votesShard != 0) {
+            if ((votesShard & 1) == 1) {
+                totalCount += 1;
+            }
+            votesShard >>= 1;
+        }
         return ProposalState {
-            yesCount: self.storage.yesCount,
-            noCount: self.storage.noCount,
+            yesCount: -self.yesCountNegative,
+            noCount: totalCount + self.yesCountNegative,
         };
     }
 }

@@ -1,6 +1,6 @@
 import '@ton/test-utils';
 import { Blockchain, printTransactionFees } from '@ton/sandbox';
-import { toNano } from '@ton/core';
+import { toNano, beginCell } from '@ton/core';
 import { Proposal } from '../output/solution3_Proposal';
 
 async function vote(blockchain: Blockchain, proposal: any, senderName: any, value: boolean) {
@@ -29,13 +29,17 @@ it('solution3', async () => {
 
     // deploy contract
     const deployer = await blockchain.treasury('deployer');
-    await proposal.send(
+    const deployResult = await proposal.send(
         deployer.getSender(),
         {
             value: toNano('0.01'),
         },
         null, // empty message, handled by `receive()` without parameters
     );
+    console.log(deployResult);
+
+    const TRUE = 1;
+    const FALSE = 0;
 
     // vote
     const voter = await blockchain.treasury('voter');
@@ -46,6 +50,10 @@ it('solution3', async () => {
             $$type: 'Vote',
             value: true,
         },
+        /*beginCell()
+        .storeUint(423322573, 32) // op
+        .storeUint(TRUE, 1)
+        .endCell().asSlice()*/
     );
     printTransactionFees(voteResult.transactions);
     var totalGasFees = 0;

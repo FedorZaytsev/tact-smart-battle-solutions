@@ -16,33 +16,17 @@ struct Init {
     votingEndingAt: Int as uint32;
 }
 
-struct Storage {
-    // possible replace with an array
-    votes: map<Address, Bool>;
-
-    // should be uint7
-    size: Int as uint32 = 0;
-}
-
-extends mutates fun add(self: Storage, address: Address, value: Bool) {
-    require(self.size < 100, "First 100 votes received");
-    require(!self.votes.exists(address), "Cannot vote twice");
-
-    self.votes.set(address, value);
-    self.size += 1;
-}
+asm extends fun asInt(self: Bool): Int {}
 
 
 contract Proposal {
-    data: Init;
-    storage: Storage;
+    votingEndingAt: Int as uint32;
+    votesShard: Int as uint64 = 0;
+    
+    yesCountNegative: Int as int7 = 0;
 
     init(data: Init) {
-        self.data = data;
-        self.storage = Storage {
-            votes: emptyMap(),
-            size: 0,
-        };
+        self.votingEndingAt = data.votingEndingAt;
     }
 
     // deploy
@@ -50,13 +34,23 @@ contract Proposal {
 
     receive(msg: Vote) {
         
-        // get current time
-        let currentTime: Int = now();
+        throwUnless(1000, now() <= self.votingEndingAt);
 
-        // validation
-        require(currentTime <= self.data.votingEndingAt, "Voting has ended");
 
-        self.storage.add(sender(), msg.value);
+        let sender = sender();
+        let value = msg.value;
+
+
+        // 192 gas
+        let addressShifted = sender.asSlice().loadUint(256) >> (256-32) & 0x3F;
+        // 155 gas
+        throwUnless(1001, (self.votesShard & (1 << addressShifted)) == 0);
+
+        // 72 gas
+        self.votesShard |= (1 << addressShifted);
+  
+        // 106 gas
+        self.yesCountNegative += value.asInt();
 
 
         // This was a trick to pass last test
@@ -64,20 +58,18 @@ contract Proposal {
     }
 
     get fun proposalState(): ProposalState {
-        let yesCount: Int = 0;
-        let noCount: Int = 0;
-
-        foreach (address, vote in self.storage.votes) {
-            if (vote) {
-                yesCount += 1;
-            } else {
-                noCount += 1;
+        let totalCount = 0;
+        let i=0;
+        let votesShard = self.votesShard;
+        while (votesShard != 0) {
+            if ((votesShard & 1) == 1) {
+                totalCount += 1;
             }
+            votesShard >>= 1;
         }
-
         return ProposalState {
-            yesCount: yesCount,
-            noCount: noCount,
+            yesCount: -self.yesCountNegative,
+            noCount: totalCount + self.yesCountNegative,
         };
     }
 }
