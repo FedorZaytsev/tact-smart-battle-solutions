@@ -14,7 +14,7 @@ contract ProposalMaster {
 
     receive(msg: DeployNewProposal) {
         // This was a trick to pass last test
-        require(now() <= msg.votingEndingAt, "Voting has ended");
+        throwUnless(61, now() <= msg.votingEndingAt);
 
         // send message to deploy new proposal
         let proposalInit: ProposalInit = ProposalInit {
@@ -65,31 +65,36 @@ message Time {
 
 contract Proposal {
     data: ProposalInit;
-    storage: Storage;
+     // possible replace with an array
+    votes: map<Address, Bool>;
+
+    // should be uint7
+    size: Int as uint32 = 0;
     votingEndingAt: Int as uint32 = -1;
 
     init(data: ProposalInit) {
-        if (sender() != data.master) {
-            throw(2025);
-        }
         self.data = data;
-        self.storage = Storage {
-            votes: emptyMap(),
-            size: 0,
-        };
+        throwUnless(2025, sender() == self.data.master);
+        self.votes = emptyMap();
     }
 
     receive(msg: Time) {
-        if (sender() != self.data.master) {
-            throw(2025);
-        }
+        throwUnless(2025, sender() == self.data.master);
+
         self.votingEndingAt = msg.votingEndingAt;
     }
 
     receive(msg: Vote) {
-        require(now() <= self.votingEndingAt, "Voting has ended");
+        throwUnless(61, now() <= self.votingEndingAt);
 
-        self.storage.add(sender(), msg.value);
+        throwUnless(61, self.size < 100);
+
+        let address = sender();
+        throwUnless(61, !self.votes.exists(address));
+
+
+        self.votes.set(address, msg.value);
+        self.size += 1;
 
     }
 
@@ -97,13 +102,14 @@ contract Proposal {
         let yesCount: Int = 0;
         let noCount: Int = 0;
 
-        foreach (address, vote in self.storage.votes) {
+        foreach (address, vote in self.votes) {
             if (vote) {
                 yesCount += 1;
             } else {
                 noCount += 1;
             }
         }
+
         return ProposalState {
             yesCount: yesCount,
             noCount: noCount,
@@ -112,23 +118,4 @@ contract Proposal {
             votingEndingAt: self.votingEndingAt,
         };
     }
-}
-
-
-
-// SOLUTION 1 COPY PASTE
-struct Storage {
-    // possible replace with an array
-    votes: map<Address, Bool>;
-
-    // should be uint7
-    size: Int as uint32 = 0;
-}
-
-extends mutates fun add(self: Storage, address: Address, value: Bool) {
-    require(self.size < 100, "First 100 votes received");
-    require(!self.votes.exists(address), "Cannot vote twice");
-
-    self.votes.set(address, value);
-    self.size += 1;
 }

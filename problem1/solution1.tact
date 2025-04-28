@@ -3,7 +3,7 @@
 //
 
 message Vote {
-    value: Bool;
+    value: Int as uint1;
 }
 
 struct ProposalState {
@@ -21,14 +21,13 @@ struct Init {
 contract Proposal {
     votingEndingAt: Int as uint32;
     // possible replace with an array
-    votes: map<Address, Bool>;
+    votes: Int as uint256 = 0;
 
-    // should be uint7
-    size: Int as uint32 = 0;
+    size: Int as uint7 = 0;
+    yesCount: Int as uint7 = 0;
 
     init(data: Init) {
         self.votingEndingAt = data.votingEndingAt;
-        self.votes = emptyMap();
     }
 
     // deploy
@@ -41,10 +40,15 @@ contract Proposal {
 
 
         throwUnless(61, self.size < 100);
-        throwUnless(62, !self.votes.exists(sender));
 
-        self.votes.set(sender, msg.value);
+        let addressShifted = sender.asSlice().loadUint(90) & 0xFF;
+        let flag = (1 << addressShifted);
+
+        throwUnless(61, (self.votes & flag) == 0);
+
+        self.votes |= flag;
         self.size += 1;
+        self.yesCount += msg.value;
 
         if (context().value > 40_000_000_000) {
             cashback(sender);
@@ -52,20 +56,10 @@ contract Proposal {
     }
 
     get fun proposalState(): ProposalState {
-        let yesCount: Int = 0;
-        let noCount: Int = 0;
-
-        foreach (address, vote in self.votes) {
-            if (vote) {
-                yesCount += 1;
-            } else {
-                noCount += 1;
-            }
-        }
-
+        
         return ProposalState {
-            yesCount: yesCount,
-            noCount: noCount,
+            yesCount: self.yesCount,
+            noCount: self.size - self.yesCount,
         };
     }
 }

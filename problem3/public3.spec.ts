@@ -53,12 +53,16 @@ it('solution3', async () => {
         { value: toNano('0.1') },
         {
             $$type: 'Vote',
-            value: true,
+            value: false,
         },
-        /*beginCell()
-        .storeUint(423322573, 32) // op
-        .storeUint(TRUE, 1)
-        .endCell().asSlice()*/
+    );
+    await proposal.send(
+        (await blockchain.treasury('voter2')).getSender(),
+        { value: toNano('0.1') },
+        {
+            $$type: 'Vote',
+            value: false,
+        },
     );
 
 
@@ -83,7 +87,7 @@ it('solution3', async () => {
     console.log("total gas fees", totalGasFees);
     console.log("total gas used", totalGasUsed);
     // the vote was counted
-    expect(await proposal.getProposalState()).toMatchObject({ yesCount: 1n, noCount: 0n });
+    expect(await proposal.getProposalState()).toMatchObject({ yesCount: 0n, noCount: 2n });
 });
 
 it('compile_handcrafted_code', async () => {
@@ -113,9 +117,15 @@ it('compile_handcrafted_code', async () => {
     // result.codeBoc contains base64 encoded BOC with code cell 
     let codeCell = Cell.fromBoc(Buffer.from(result.codeBoc, "base64"))[0];
     
+
+    let codeSlice = codeCell.asSlice();
     // result.fiftCode contains assembly version of your code (for debug purposes)
-    console.log(result.codeBoc)
-    console.log(result.fiftCode)
+    /*console.log("codeCell  base ", codeSlice);
+    console.log("codeSlice.remainingRefs", codeSlice.remainingRefs);
+    console.log("codeCell", codeSlice.preloadMaybeRef());
+    console.log("codeCell", codeSlice.preloadMaybeRef()?.refs);*/
+    console.log("result.codeBoc", result.codeBoc);
+    //console.log(result.fiftCode)
 });
 //*/
 /*

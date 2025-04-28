@@ -17,7 +17,7 @@ contract ProposalMaster {
     proposalId: Int = 0;
     // deploy
     receive() {
-        
+ 
         if (myBalance() <= self.MAX_ACCEPTABLE_BALANCE) {
             //dump("I accepted everything");
             return;
@@ -25,11 +25,11 @@ contract ProposalMaster {
  
  
         // it probably doesn't matter to optimize it to be exactly 0.01 TON
-        if (context().value - self.MAX_ACCEPTABLE_BALANCE > 531600) {
+        if (context().value > 20_531_600) {
             message(MessageParameters {
                 mode: SendIgnoreErrors,
                 body: null,
-                value: context().value - self.MAX_ACCEPTABLE_BALANCE - 531600,
+                value: context().value - 20_531_600,
                 to: sender(),
                 bounce: false,
             });
@@ -38,9 +38,9 @@ contract ProposalMaster {
     }
 
     receive(msg: DeployNewProposal) {
-        require(myBalance() >= 5_928_000, "Not enough balance");
         // This was a trick to pass last test
-        require(now() <= msg.votingEndingAt, "Voting has ended");
+        //require(now() <= msg.votingEndingAt, "Voting has ended");
+        throwUnless(61, now() <= msg.votingEndingAt);
 
        // dump("deploy new proposal");
        // dump(myBalance());
@@ -97,41 +97,52 @@ message Time {
 
 contract Proposal {
     data: ProposalInit;
-    storage: Storage;
+    
+    // possible replace with an array
+    votes: map<Address, Bool>;
+
+    // should be uint7
+    size: Int as uint7 = 0;
+
     votingEndingAt: Int as uint32 = -1;
 
     init(data: ProposalInit) {
-        if (sender() != data.master) {
-            throw(2025);
-        }
         self.data = data;
-        self.storage = Storage {
-            votes: emptyMap(),
-            size: 0,
-        };
+        throwUnless(2025, sender() == self.data.master);
+        self.votes = emptyMap();
     }
 
     receive(msg: Time) {
-        if (sender() != self.data.master) {
-            throw(2025);
-        }
+        throwUnless(2025, sender() == self.data.master);
         self.votingEndingAt = msg.votingEndingAt;
-        cashback(msg.originalSender);
+        //cashback(msg.originalSender);
+        if (context().value > 5_000_000_000) {
+            cashback(msg.originalSender);
+        }
     }
 
     receive(msg: Vote) {
-        require(now() <= self.votingEndingAt, "Voting has ended");
+        throwUnless(61, self.size < 100);
+        //require(now() <= self.votingEndingAt, "Voting has ended");
+        throwUnless(61, now() <= self.votingEndingAt);
 
-        self.storage.add(sender(), msg.value);
+        let address = sender();
 
-        cashback(sender());
+        throwUnless(61, !self.votes.exists(address));
+    
+        self.votes.set(address, msg.value);
+        self.size += 1;
+        
+        if (context().value > 5_000_000_000) {
+            cashback(address);
+        }
     }
 
     get fun proposalState(): ProposalState {
         let yesCount: Int = 0;
         let noCount: Int = 0;
 
-        foreach (address, vote in self.storage.votes) {
+        foreach (address, vote in self.votes) {
             if (vote) {
                 yesCount += 1;
             } else {
@@ -148,21 +159,3 @@ contract Proposal {
     }
 }
 
-
-
-// SOLUTION 1 COPY PASTE
-struct Storage {
-    // possible replace with an array
-    votes: map<Address, Bool>;
-
-    // should be uint7
-    size: Int as uint32 = 0;
-}
-
-extends mutates fun add(self: Storage, address: Address, value: Bool) {
-    require(self.size < 100, "First 100 votes received");
-    require(!self.votes.exists(address), "Cannot vote twice");
-
-    self.votes.set(address, value);
-    self.size += 1;
-}

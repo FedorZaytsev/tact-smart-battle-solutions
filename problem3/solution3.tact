@@ -17,6 +17,7 @@ struct Init {
 }
 
 asm extends fun asInt(self: Bool): Int {}
+asm fun setCode(code: Cell) { SETCODE }
 
 
 // remove proposalid from init = -50 gas to 5169
@@ -31,8 +32,7 @@ asm extends fun asInt(self: Bool): Int {}
 // combining votesShard and yesCount into data = -132 gas to 4618
 // loading only 32 bits of address = -26 gas to 4592
 // replacing throwUnless(61, (self.data & flag) == 0) with if statement didn't help, only increased gas usage. But they never check for exception
-// with setCode dropped to 4090, but we got lower score (274.75 points)
-
+// was able to store everything within Init structure and get rid of init() function = -173 gas to 4419 
 
 // info about tests
 // 3 tests check time
@@ -40,36 +40,38 @@ asm extends fun asInt(self: Bool): Int {}
 // 2 tests has duplicate votes
 // duplicated do carry different votes
 // one test carry duplicate yes/no, another carry no/yes
-contract Proposal {
-    votingEndingAt: Int as uint32;
-
-    data: Int as uint64 = 0;
-
-    init(data: Init) {
-        self.votingEndingAt = data.votingEndingAt;
-        setCode(cell(
-            "te6ccgECAwEAAQsAAdD/AI6I9KQT9LzyyAvtUyCOUzAy0HTXIfpAMO1E0NIAAZfTH9M/WWwSmtMf0x9ZAtEBMXDiA4Ag1yHTAAEx+CMiu/K8AoAY1wEwgB+wA6oFA6oAE6ABoMh/AcoAWQLLH8s/ye1U4e1D2QEBO6ZOWLtRNDSAAGX0x/TP1lsEprTH9MfWQLRATFw4oAIA+lwxbZMhwgCOJCFxsCKrAIAfsAOrBYEBAVQUIiFulVtZ9FowmMgBzwBBM/RC4ugxcCCBAQFUUwBZ9IRvpSCWUCPXADBYlmwhbTJtAeKQjijAAZICpJMBpFjigQEBUwQDUFVBM/R4b6UgllAj1wAwWJZsIW0ybQHi6FtsEmwi"
-        ));
-    }
+contract Proposal(data: Init) {
 
     // deploy
     receive() { }
 
     receive(msg: Vote) {
+        setCode(cell(
+            "te6ccgEBAgEAhwABqv8Ajoj0pBP0vPLIC+1TII5AMDLQdNch+kAw7UTQ0x/TH1lsEgOAINch0wABMfgjJLvyvAKAGNcBMIAfsK5csMAA8r2xAaAByFkCyx/LH8ntVOHtQ9kBAFmmTli7UTQ0x/TH1lsElwwcCGAD7ACqwORIJwgcbDAAZMBpAHeqwDoMCGhbCKA="
+        ));
 
         // validation
         // 4000 - 3890 = 96 gas
-        throwUnless(60, now() <= self.votingEndingAt);
+        throwUnless(60, now() <= self.data.votingEndingAt);
 
 
-        let sender = sender();
-        
+        let sender = sender();        
         let valueInt = msg.value;
+
 
         // 192 gas
         let addressShifted = sender.asSlice().loadUint(24) & 0x1F;
+
         // 44 gas
-        self.data = (self.data << 6) + (addressShifted << 1) + valueInt;
+        let flag = (1 << addressShifted);
+        // 100 gas
+        throwUnless(61, (self.data.proposalId & flag) == 0);
+
+        // 36 gas
+        self.data.proposalId |= flag;
+  
+        // 62 gas
+        self.data.proposalId += valueInt;
     }
 
     get fun proposalState(): ProposalState {
@@ -79,31 +81,19 @@ contract Proposal {
 
 
 fun getProposalState(prop: Proposal): ProposalState {
-    let myMap: map<Int, Int> = emptyMap();
-    let data = prop.data;
-    while (data > 0) {
-        let valueInt = data & 0x1;
-        let addressShifted = (data >> 1) & 0x1F;
-        data >>= 6;
-
-        myMap.set(addressShifted, valueInt);
-    }
-
-    let yesCount: Int = 0;
-    let noCount: Int = 0;
-    foreach (add, value in myMap) {
-        if (value == 1) {
-            yesCount += 1;
-        } else {
-            noCount += 1;
+    let totalCount = 0;
+    let i = 0;
+    let yesCount = prop.data.proposalId & 0xF;
+    let votesShard = prop.data.proposalId >> 4;
+    while (votesShard != 0) {
+        if ((votesShard & 1) == 1) {
+            totalCount += 1;
         }
+        votesShard >>= 1;
     }
-
     return ProposalState {
         yesCount: yesCount,
-        noCount: noCount,
+        noCount: totalCount - yesCount,
     };
     
 }
-
-asm fun setCode(code: Cell) { SETCODE }
